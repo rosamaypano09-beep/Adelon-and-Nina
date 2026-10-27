@@ -467,7 +467,7 @@ export const siteConfig = {
       lineBelow: "request the honour of your presence",
     },
     showCeremonyDetails: true,
-    eyebrow: "You are invited",
+    eyebrow: "You're invited",
     message: "We can't wait to celebrate with you",
     // Rotates under the progress bar while the invitation loads
     statusMessages: [

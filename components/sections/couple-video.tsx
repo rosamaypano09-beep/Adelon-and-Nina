@@ -115,6 +115,33 @@ function formatTime(sec: number) {
   return `${m}:${String(s).padStart(2, "0")}`
 }
 
+// Accepts a bare 11-character ID or any common YouTube link
+// (youtu.be/…, watch?v=…, /embed/…, /shorts/…, /live/…). Returns "" when it isn't YouTube.
+function resolveYouTubeId(input: string | undefined): string {
+  const raw = (input ?? "").trim()
+  if (!raw) return ""
+  if (/^[\w-]{11}$/.test(raw)) return raw
+  try {
+    const url = new URL(raw.startsWith("http") ? raw : `https://${raw}`)
+    const host = url.hostname.replace(/^(www|m|music)\./, "")
+    let id = ""
+    if (host === "youtu.be") id = url.pathname.split("/")[1] ?? ""
+    else if (host === "youtube.com" || host === "youtube-nocookie.com") {
+      id = url.searchParams.get("v") ?? ""
+      if (!id) {
+        const m = url.pathname.match(/^\/(?:embed|shorts|live|v)\/([\w-]{11})/)
+        id = m?.[1] ?? ""
+      }
+    }
+    return /^[\w-]{11}$/.test(id) ? id : ""
+  } catch {
+    return ""
+  }
+}
+
+// If playback hasn't started this long after a tap, retry muted (autoplay policies)
+const PLAY_RETRY_MS = 2500
+
 function loadYouTubeApi(): Promise<void> {
   return new Promise((resolve) => {
     if (window.YT && window.YT.Player) return resolve()
@@ -135,23 +162,33 @@ function loadYouTubeApi(): Promise<void> {
  * One player surface for both sources. A self-hosted file uses a plain <video>;
  * a YouTube ID uses the IFrame API with its UI switched off, a click shield over
  * the frame and our own controls, so no YouTube branding is shown.
+ *
+ * The player is built while the section scrolls into view (`armed`), hidden under
+ * the cover, so the visitor's tap can start playback directly. Mobile browsers
+ * refuse to play when the start is deferred until after an async script load.
  */
-function useVideoPlayer(videoSrc: string, youtubeId: string, started: boolean) {
+function useVideoPlayer(videoSrc: string, youtubeId: string, armed: boolean) {
   const { pauseMusic, resumeMusic } = useAudio()
   const nativeRef = useRef<HTMLVideoElement>(null)
   const ytHostRef = useRef<HTMLDivElement>(null)
   const ytRef = useRef<any>(null)
+  const ytReadyRef = useRef(false)
+  const wantPlayRef = useRef(false) // tapped before the YouTube player was ready
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const [playing, setPlaying] = useState(false)
   const [ended, setEnded] = useState(false)
   const [revealed, setRevealed] = useState(false) // frame visible (title flash has passed)
   const [muted, setMuted] = useState(false)
+  const [failed, setFailed] = useState(false)
   const [time, setTime] = useState(0)
   const [duration, setDuration] = useState(0)
   const useNative = Boolean(videoSrc)
 
   const onPlay = useCallback(() => {
+    clearTimeout(retryTimerRef.current)
     setPlaying(true)
     setEnded(false)
+    setFailed(false)
     pauseMusic()
   }, [pauseMusic])
   const onPause = useCallback(() => {
@@ -165,9 +202,17 @@ function useVideoPlayer(videoSrc: string, youtubeId: string, started: boolean) {
     resumeMusic()
   }, [resumeMusic])
 
-  // YouTube: build the player once the visitor presses play
+  const onFail = useCallback(() => {
+    clearTimeout(retryTimerRef.current)
+    wantPlayRef.current = false
+    setPlaying(false)
+    setFailed(true)
+    resumeMusic()
+  }, [resumeMusic])
+
+  // YouTube: build the (paused) player as the section comes into view
   useEffect(() => {
-    if (useNative || !started || !ytHostRef.current) return
+    if (useNative || !youtubeId || !armed || !ytHostRef.current) return
     let cancelled = false
     let revealTimer: ReturnType<typeof setTimeout> | undefined
     const host = ytHostRef.current
@@ -181,7 +226,7 @@ function useVideoPlayer(videoSrc: string, youtubeId: string, started: boolean) {
         width: "100%",
         height: "100%",
         playerVars: {
-          autoplay: 1,
+          autoplay: 0,
           controls: 0,
           disablekb: 1,
           fs: 0,
@@ -194,9 +239,12 @@ function useVideoPlayer(videoSrc: string, youtubeId: string, started: boolean) {
         },
         events: {
           onReady: (e: any) => {
+            ytReadyRef.current = true
             setDuration(e.target.getDuration() || 0)
-            e.target.playVideo()
+            if (wantPlayRef.current) e.target.playVideo()
           },
+          // 2 bad ID, 5 HTML5 error, 100 removed/private, 101/150 embedding disabled
+          onError: () => onFail(),
           onStateChange: (e: any) => {
             if (e.data === YT_PLAYING) {
               onPlay()
@@ -217,23 +265,17 @@ function useVideoPlayer(videoSrc: string, youtubeId: string, started: boolean) {
     return () => {
       cancelled = true
       clearTimeout(revealTimer)
+      clearTimeout(retryTimerRef.current)
       try {
         ytRef.current?.destroy?.()
       } catch {
         // ignore
       }
       ytRef.current = null
+      ytReadyRef.current = false
       host.replaceChildren()
     }
-  }, [useNative, started, youtubeId, onPlay, onPause, onEnd])
-
-  // Native: start as soon as the visitor presses play
-  useEffect(() => {
-    if (!useNative || !started) return
-    const v = nativeRef.current
-    if (!v) return
-    v.play().catch(() => setPlaying(false))
-  }, [useNative, started])
+  }, [useNative, armed, youtubeId, onPlay, onPause, onEnd, onFail])
 
   // Progress
   useEffect(() => {
@@ -249,11 +291,37 @@ function useVideoPlayer(videoSrc: string, youtubeId: string, started: boolean) {
     return () => window.clearInterval(id)
   }, [playing, useNative])
 
+  // Called straight from the tap handler so the browser counts it as a user gesture
   const play = () => {
-    if (useNative) nativeRef.current?.play().catch(() => {})
-    else ytRef.current?.playVideo?.()
+    setFailed(false)
+    if (useNative) {
+      const v = nativeRef.current
+      if (!v) return
+      v.play().catch(() => {
+        // Blocked with sound: fall back to muted playback (visitor can unmute)
+        v.muted = true
+        setMuted(true)
+        v.play().catch(onFail)
+      })
+      return
+    }
+    wantPlayRef.current = true
+    if (ytReadyRef.current) ytRef.current?.playVideo?.()
+    // Some mobile browsers ignore an unmuted start inside the iframe; retry muted
+    clearTimeout(retryTimerRef.current)
+    retryTimerRef.current = setTimeout(() => {
+      const yt = ytRef.current
+      if (!wantPlayRef.current || !yt?.getPlayerState) return
+      if (yt.getPlayerState() !== YT_PLAYING) {
+        yt.mute?.()
+        setMuted(true)
+        yt.playVideo?.()
+      }
+    }, PLAY_RETRY_MS)
   }
   const pause = () => {
+    wantPlayRef.current = false
+    clearTimeout(retryTimerRef.current)
     if (useNative) nativeRef.current?.pause()
     else ytRef.current?.pauseVideo?.()
   }
@@ -276,7 +344,7 @@ function useVideoPlayer(videoSrc: string, youtubeId: string, started: boolean) {
 
   return {
     useNative, nativeRef, ytHostRef, playing, ended, revealed: useNative ? playing || time > 0 : revealed,
-    muted, time, duration, setDuration, setTime, onPlay, onPause, onEnd,
+    muted, failed, time, duration, setDuration, setTime, onPlay, onPause, onEnd, onFail,
     toggle, play, seek, toggleMute,
   }
 }
@@ -288,19 +356,45 @@ export function CoupleVideo({ skyBackdrop = true }: { skyBackdrop?: boolean } = 
   const siteConfig = useSiteConfig()
   // Fall back to the bundled config if a remote override is missing this block.
   const content = siteConfig.coupleVideo ?? defaultSiteConfig.coupleVideo
-  const videoSrc = content.videoSrc ?? ""
+  // A YouTube link pasted into videoSrc is played through YouTube, not as a file
+  const srcAsYouTube = resolveYouTubeId(content.videoSrc)
+  const videoSrc = srcAsYouTube ? "" : (content.videoSrc ?? "").trim()
+  const youtubeId = srcAsYouTube || resolveYouTubeId(content.youtubeId)
 
   const [started, setStarted] = useState(false)
+  const [armed, setArmed] = useState(false)
   const frameRef = useRef<HTMLDivElement>(null)
-  const player = useVideoPlayer(videoSrc, content.youtubeId, started)
+  const player = useVideoPlayer(videoSrc, youtubeId, armed)
+
+  // Load the player shortly before the section is on screen
+  useEffect(() => {
+    const el = frameRef.current
+    if (!el || armed) return
+    if (typeof IntersectionObserver === "undefined") return setArmed(true)
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setArmed(true)
+          io.disconnect()
+        }
+      },
+      { rootMargin: "600px 0px" },
+    )
+    io.observe(el)
+    return () => io.disconnect()
+  }, [armed])
 
   // The cover hides YouTube's own start / pause / end screens
   const showCover = !started || !player.revealed || !player.playing
   const progress = player.duration ? player.time / player.duration : 0
+  const watchUrl = youtubeId ? `https://www.youtube.com/watch?v=${youtubeId}` : videoSrc
 
   const handleStart = () => {
-    if (!started) setStarted(true)
-    else if (player.ended) {
+    if (!armed) setArmed(true)
+    if (!started) {
+      setStarted(true)
+      player.play()
+    } else if (player.ended) {
       player.seek(0)
       player.play()
     } else player.toggle()
@@ -309,9 +403,14 @@ export function CoupleVideo({ skyBackdrop = true }: { skyBackdrop?: boolean } = 
   const goFullscreen = () => {
     const el = frameRef.current
     if (!el) return
-    if (document.fullscreenElement) document.exitFullscreen?.()
-    else el.requestFullscreen?.()
+    if (document.fullscreenElement) return void document.exitFullscreen?.()
+    if (el.requestFullscreen) return void el.requestFullscreen().catch(() => {})
+    // iPhone Safari only allows the <video> element itself to go full screen
+    const v = player.nativeRef.current as (HTMLVideoElement & { webkitEnterFullscreen?: () => void }) | null
+    v?.webkitEnterFullscreen?.()
   }
+
+  if (!videoSrc && !youtubeId) return null
 
   return (
     <section
@@ -355,19 +454,20 @@ export function CoupleVideo({ skyBackdrop = true }: { skyBackdrop?: boolean } = 
               style={videoFrameStyle}
             >
               <div className="relative w-full" style={{ paddingBottom: "56.25%" }}>
-                {/* Video layer */}
-                {started && (
+                {/* Video layer (built early under the cover so a tap can start it at once) */}
+                {armed && (
                   <div className="absolute inset-0 overflow-hidden bg-black">
                     {player.useNative ? (
                       <video
                         ref={player.nativeRef}
-                        src={encodeURI(videoSrc)}
-                        className="absolute inset-0 h-full w-full object-cover"
+                        src={/^https?:\/\//.test(videoSrc) ? videoSrc : encodeURI(videoSrc)}
+                        className="absolute inset-0 h-full w-full object-contain"
                         playsInline
-                        preload="auto"
+                        preload="metadata"
                         onPlay={player.onPlay}
                         onPause={player.onPause}
                         onEnded={player.onEnd}
+                        onError={player.onFail}
                         onLoadedMetadata={(e) => player.setDuration(e.currentTarget.duration)}
                         onTimeUpdate={(e) => player.setTime(e.currentTarget.currentTime)}
                       />
@@ -426,7 +526,10 @@ export function CoupleVideo({ skyBackdrop = true }: { skyBackdrop?: boolean } = 
                             "0 0 0 6px rgb(255 255 255 / 25%), 0 10px 26px color-mix(in srgb, var(--color-welcome-navy) 35%, transparent)",
                         }}
                       >
-                        {started && player.playing ? (
+                        {started && !player.failed && !player.playing && !player.ended && player.time === 0 ? (
+                          // Tapped, waiting for the first frame
+                          <span className="h-3 w-3 animate-ping rounded-full bg-white" aria-hidden />
+                        ) : started && player.playing ? (
                           // Playing but YouTube's title is still on screen: gentle loading pulse
                           <span className="h-3 w-3 animate-ping rounded-full bg-white" aria-hidden />
                         ) : (
@@ -435,10 +538,21 @@ export function CoupleVideo({ skyBackdrop = true }: { skyBackdrop?: boolean } = 
                       </span>
                     </span>
                   </button>
+                  {player.failed && watchUrl && (
+                    <a
+                      href={watchUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="absolute bottom-3 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-white/90 px-4 py-1.5 text-[0.7rem] uppercase tracking-[0.14em] shadow sm:bottom-5"
+                      style={{ color: "var(--color-welcome-navy)", fontFamily: "var(--font-cinzel), serif" }}
+                    >
+                      Can&apos;t play here — watch {youtubeId ? "on YouTube" : "video"}
+                    </a>
+                  )}
                 </div>
 
                 {/* Our own controls */}
-                {started && (
+                {started && !player.failed && (
                   <div
                     className={`absolute inset-x-0 bottom-0 z-30 flex items-center gap-3 px-3 pb-2.5 pt-8 transition-opacity duration-300 sm:px-4 sm:pb-3 ${
                       player.playing && player.revealed ? "opacity-0 group-hover:opacity-100 focus-within:opacity-100" : "opacity-100"

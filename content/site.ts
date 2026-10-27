@@ -521,8 +521,9 @@ export const siteConfig = {
     closingNote: "A glimpse into the moments that made our hearts one",
     // Your own video file in /public (e.g. "/video/our-story.mp4"). When set it is
     // played directly with no YouTube at all; leave "" to use youtubeId instead.
-    videoSrc: "https://youtu.be/c6ThrZn8OuY",
-    // YouTube video ID — the part after "watch?v=" (or after "youtu.be/")
+    // (A YouTube link pasted here is detected and played through YouTube.)
+    videoSrc: "",
+    // YouTube video ID or full link (youtu.be/…, watch?v=…, /shorts/…, /embed/…)
     youtubeId: "c6ThrZn8OuY",
     // Cover image shown before the video plays
     thumbnail: "/desktop-background/couple (6).webp",

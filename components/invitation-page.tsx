@@ -264,12 +264,12 @@ export function InvitationPage({ sponsorsList, showEntourage = true }: Invitatio
               {/* One continuous circle pattern behind the video and love story (same as Details) — no seam between them */}
               <div className="relative">
                 <PlainBubbles />
-                {/* <CoupleVideo skyBackdrop={false} /> */}
+                <CoupleVideo skyBackdrop={false} />
                 <LoveStory skyBackdrop={false} />
               </div>
               <Countdown />
               <Gallery />
-              {/* <MessageVideo /> */}
+             {/*  <MessageVideo />*/}
               <Messages />
               <Details />
               <WeddingTimeline />
@@ -288,13 +288,13 @@ export function InvitationPage({ sponsorsList, showEntourage = true }: Invitatio
               <Registry />
               <WeddingPlaylist /> 
               <SnapShare />
-              {/* One continuous circle pattern behind See You There and the footer — no seam between them */}
+              {/* Full-bleed photo section — paints its own background, so it sits outside the footer's pattern */}
+              <SeeYouThere />
               <div className="relative isolate" style={{ background: "var(--color-bg-pattern-base)" }}>
                 <PlainBubbles bands={3} />
-                {/* Pink paper wash + rising hearts (section-backdrop.tsx) + one double border around both sections */}
+                {/* Pink paper wash + rising hearts (section-backdrop.tsx) + double border around the footer */}
                 <SectionBackdrop />
                 {siteConfig.seeYouThere.plain.showFrame && <div className="deco-frame" aria-hidden="true" />}
-                <SeeYouThere background={false} />
                 <Footer background={false} />
               </div>
               </motion.div>

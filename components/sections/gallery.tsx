@@ -294,9 +294,10 @@ export function Gallery() {
   const galleryItems: GalleryItem[] = gallery.images
   const decos = gallery.decos
 
-  const [selectedImage, setSelectedImage] = useState<GalleryItem | null>(null)
-  const [currentIndex, setCurrentIndex] = useState(0)
-  const [isLoading, setIsLoading] = useState(true)
+  // Index of the photo open in the lightbox (null = closed)
+  const [openIndex, setOpenIndex] = useState<number | null>(null)
+  const currentIndex = openIndex ?? 0
+  const selectedImage = openIndex !== null ? galleryItems[openIndex] ?? null : null
   const [isMounted, setIsMounted] = useState(false)
   const [touchStartX, setTouchStartX] = useState<number | null>(null)
   const [touchDeltaX, setTouchDeltaX] = useState(0)
@@ -308,6 +309,9 @@ export function Gallery() {
   const [panStart, setPanStart] = useState<{ x: number; y: number; panX: number; panY: number } | null>(null)
   const pointerStart = useRef({ x: 0, y: 0, dragging: false })
   const swipeConsumed = useRef(false)
+  const closeButtonRef = useRef<HTMLButtonElement>(null)
+  const returnFocusRef = useRef<HTMLElement | null>(null)
+  const thumbStripRef = useRef<HTMLDivElement>(null)
 
   const resetZoom = useCallback(() => {
     setZoomScale(1)
@@ -316,14 +320,19 @@ export function Gallery() {
   }, [])
 
   const closeLightbox = useCallback(() => {
-    setSelectedImage(null)
+    setOpenIndex(null)
     resetZoom()
   }, [resetZoom])
 
-  const openLightbox = useCallback((item: GalleryItem, index: number) => {
+  const openLightbox = useCallback((_item: GalleryItem, index: number) => {
     if (pointerStart.current.dragging) return
-    setSelectedImage(item)
-    setCurrentIndex(index)
+    returnFocusRef.current = document.activeElement as HTMLElement | null
+    setOpenIndex(index)
+    resetZoom()
+  }, [resetZoom])
+
+  const showImage = useCallback((index: number) => {
+    setOpenIndex(index)
     resetZoom()
   }, [resetZoom])
 
@@ -341,22 +350,27 @@ export function Gallery() {
     setIsMounted(true)
   }, [])
 
-  useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 500)
-    return () => clearTimeout(timer)
-  }, [])
-
   const navigateImage = useCallback((direction: 'prev' | 'next') => {
-    setCurrentIndex((prevIndex) => {
-      const newIndex =
-        direction === 'next'
-          ? (prevIndex + 1) % galleryItems.length
-          : (prevIndex - 1 + galleryItems.length) % galleryItems.length
-      setSelectedImage(galleryItems[newIndex])
-      return newIndex
-    })
+    const n = galleryItems.length
+    setOpenIndex((i) => (i === null ? i : direction === 'next' ? (i + 1) % n : (i - 1 + n) % n))
     resetZoom()
-  }, [resetZoom, galleryItems])
+  }, [resetZoom, galleryItems.length])
+
+  const isOpen = openIndex !== null
+
+  // Move focus into the lightbox on open, and back to the photo that opened it on close
+  useEffect(() => {
+    if (!isOpen) return
+    closeButtonRef.current?.focus({ preventScroll: true })
+    return () => returnFocusRef.current?.focus({ preventScroll: true })
+  }, [isOpen])
+
+  // Keep the active thumbnail in view
+  useEffect(() => {
+    if (openIndex === null) return
+    const thumb = thumbStripRef.current?.children[openIndex] as HTMLElement | undefined
+    thumb?.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" })
+  }, [openIndex])
 
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
@@ -377,7 +391,7 @@ export function Gallery() {
   }, [selectedImage, navigateImage, closeLightbox])
 
   useEffect(() => {
-    if (!selectedImage) return
+    if (!isOpen) return
     const previousHtmlOverflow = document.documentElement.style.overflow
     const previousBodyOverflow = document.body.style.overflow
     document.documentElement.style.overflow = 'hidden'
@@ -386,7 +400,7 @@ export function Gallery() {
       document.documentElement.style.overflow = previousHtmlOverflow
       document.body.style.overflow = previousBodyOverflow
     }
-  }, [selectedImage])
+  }, [isOpen])
 
   // Preload adjacent images for smoother nav
   useEffect(() => {
@@ -456,18 +470,7 @@ export function Gallery() {
 
       {/* Gallery content */}
       <div className="relative z-20 w-full max-w-6xl mx-auto px-6 sm:px-10 md:px-12 pb-2 sm:pb-3">
-        {isLoading ? (
-          <div className="flex items-center justify-center h-64 sm:h-80 md:h-96">
-            <div
-              className="h-12 w-12 animate-spin rounded-full border-[3px]"
-              style={{
-                borderColor: "color-mix(in srgb, var(--color-motif-blush) 70%, transparent)",
-                borderTopColor: C.blue,
-              }}
-            />
-          </div>
-        ) : (
-          <>
+        <>
             {/* Mobile: endless swipe carousel; bleeds past the side padding for slimmer margins */}
             <div className="-mx-6 sm:mx-0">
               <MobileInfiniteCarousel
@@ -480,12 +483,12 @@ export function Gallery() {
             </div>
 
             {/* Tablet/Desktop: framed grid with a gentle stagger */}
-            <div className="hidden sm:grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 md:gap-5 lg:gap-6 lg:pb-8">
+            <div className="hidden sm:grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-5 lg:gap-6 lg:pb-8">
               {galleryItems.map((item, index) => (
                 <button
                   key={item.image + index}
                   type="button"
-                  className={`group relative w-full rounded-xl p-1.5 transition-all duration-300 hover:-translate-y-1 ${index % 2 === 1 ? "lg:translate-y-8 lg:hover:translate-y-7" : ""}`}
+                  className={`group relative w-full rounded-xl p-1.5 transition-all duration-300 hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-motif-accent)] focus-visible:ring-offset-2 ${index % 2 === 1 ? "lg:translate-y-8 lg:hover:translate-y-7" : ""}`}
                   style={frameStyle}
                   onPointerDown={handleThumbPointerDown}
                   onPointerMove={handleThumbPointerMove}
@@ -497,7 +500,7 @@ export function Gallery() {
                       src={encodeURI(item.image)}
                       alt={item.text || `Gallery image ${index + 1}`}
                       fill
-                      sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 20vw"
+                      sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
                       className="object-cover transition-transform duration-700 group-hover:scale-105"
                     />
                     <div
@@ -547,8 +550,7 @@ export function Gallery() {
               src={decos.footerVine}
               className="mx-auto mt-6 block h-auto w-56 select-none opacity-90 sm:mt-8 sm:w-72 md:w-96"
             />
-          </>
-        )}
+        </>
       </div>
       </Section>
 
@@ -633,6 +635,7 @@ export function Gallery() {
                 </span>
               </div>
               <button
+                ref={closeButtonRef}
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation()
@@ -673,10 +676,11 @@ export function Gallery() {
             )}
 
             <div
-              className="relative flex max-h-[82dvh] max-w-[92vw] items-center justify-center"
+              className="relative flex max-h-[82dvh] max-w-[92vw] items-center justify-center sm:-translate-y-8 sm:max-h-[72dvh]"
               onClick={(e) => e.stopPropagation()}
             >
               <Image
+                key={selectedImage.image}
                 src={encodeURI(selectedImage.image)}
                 alt={selectedImage.text.trim() || `Gallery image ${currentIndex + 1}`}
                 width={1600}
@@ -687,7 +691,7 @@ export function Gallery() {
                   transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoomScale})`,
                   transition: pinchStartDist ? "none" : "transform 200ms ease-out",
                 }}
-                className="h-auto max-h-[82dvh] w-auto max-w-[92vw] rounded-lg object-contain shadow-2xl will-change-transform"
+                className="h-auto max-h-[82dvh] w-auto max-w-[92vw] rounded-lg object-contain shadow-2xl will-change-transform animate-in fade-in zoom-in-[0.98] duration-300 sm:max-h-[72dvh]"
               />
               {zoomScale > 1 && (
                 <button
@@ -708,6 +712,34 @@ export function Gallery() {
                 <p className="rounded-full border border-white/10 bg-black/40 px-3 py-1.5 text-xs text-white/70 backdrop-blur-sm">
                   {gallery.lightboxSwipeHint}
                 </p>
+              </div>
+            )}
+
+            {/* Thumbnail strip (tablet/desktop) */}
+            {galleryItems.length > 1 && (
+              <div
+                ref={thumbStripRef}
+                className="absolute inset-x-0 bottom-4 z-20 mx-auto hidden max-w-[min(92vw,56rem)] gap-2 overflow-x-auto px-2 py-1.5 sm:flex [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                onClick={(e) => e.stopPropagation()}
+                aria-label="Choose a photo"
+              >
+                {galleryItems.map((item, idx) => {
+                  const isActive = idx === currentIndex
+                  return (
+                    <button
+                      key={item.image + idx}
+                      type="button"
+                      onClick={() => showImage(idx)}
+                      aria-label={`Show photo ${idx + 1}`}
+                      aria-current={isActive ? "true" : undefined}
+                      className={`relative mx-auto h-16 w-12 shrink-0 overflow-hidden rounded-md transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white md:h-20 md:w-14 ${
+                        isActive ? "opacity-100 ring-2 ring-white/90" : "opacity-50 hover:opacity-85"
+                      }`}
+                    >
+                      <Image src={encodeURI(item.image)} alt="" fill sizes="56px" className="object-cover" />
+                    </button>
+                  )
+                })}
               </div>
             )}
           </div>

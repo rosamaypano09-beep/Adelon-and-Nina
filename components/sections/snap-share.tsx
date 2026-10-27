@@ -172,6 +172,32 @@ function PrimaryButton({
   )
 }
 
+// Framed photo that keeps faces in view (portrait shots are anchored near the top)
+function MomentPhoto({ src, alt, sizes, className = "" }: { src: string; alt: string; sizes: string; className?: string }) {
+  return (
+    <div
+      className={`group relative h-full w-full overflow-hidden rounded-xl ${className}`}
+      style={{
+        background: PALE,
+        boxShadow: `0 0 0 1px ${HAIRLINE}, 0 10px 22px -16px color-mix(in srgb, var(--color-welcome-navy) 60%, transparent)`,
+      }}
+    >
+      <Image
+        src={src}
+        alt={alt}
+        fill
+        sizes={sizes}
+        className="object-cover object-[center_28%] transition-transform duration-700 ease-out group-hover:scale-[1.04] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
+      />
+      <span
+        className="pointer-events-none absolute inset-0 rounded-xl"
+        style={{ boxShadow: "inset 0 0 0 1px rgb(255 255 255 / 45%)" }}
+        aria-hidden
+      />
+    </div>
+  )
+}
+
 const SOCIAL = {
   instagram: { Icon: Instagram, label: "Instagram" },
   facebook: { Icon: Facebook, label: "Facebook" },
@@ -461,19 +487,28 @@ export function SnapShare() {
 
         {showMoments ? (
           <div className="mt-6 grid grid-cols-1 items-start gap-5 sm:mt-8 sm:gap-6 md:mt-10 lg:grid-cols-2 lg:gap-8">
-            <ContentCard>
+            <ContentCard className="lg:sticky lg:top-8">
               <CardTitle>{content.moments.title}</CardTitle>
-              <div className="grid w-full min-w-0 grid-cols-2 gap-2 sm:gap-3">
-                {[momentA, momentB].filter(Boolean).map((src, i) => (
-                  <div key={src} className="relative aspect-square overflow-hidden rounded-xl" style={{ boxShadow: `0 0 0 1px ${HAIRLINE}` }}>
-                    <Image src={src} alt={`Wedding moment ${i + 1}`} fill sizes="(max-width: 1024px) 45vw, 22vw" className="object-cover" />
-                  </div>
-                ))}
-                {momentC ? (
-                  <div className="relative col-span-2 aspect-[3/2] overflow-hidden rounded-xl" style={{ boxShadow: `0 0 0 1px ${HAIRLINE}` }}>
-                    <Image src={momentC} alt="Wedding moment 3" fill sizes="(max-width: 1024px) 90vw, 45vw" className="object-cover" />
-                  </div>
+              <span className="mx-auto block h-px w-24 sm:w-32" style={insideDividerLineStyle} aria-hidden />
+              {/* Portrait photos: tall feature on the left, two stacked on the right */}
+              <div className="grid w-full min-w-0 grid-cols-5 grid-rows-2 gap-2 sm:gap-3">
+                {momentA ? (
+                  <MomentPhoto
+                    src={momentA}
+                    alt={`${coupleDisplayName} — favorite moment 1`}
+                    sizes="(max-width: 1024px) 55vw, 27vw"
+                    className={momentB || momentC ? "col-span-3 row-span-2 aspect-[3/4]" : "col-span-5 row-span-2 aspect-[3/4]"}
+                  />
                 ) : null}
+                {[momentB, momentC].filter(Boolean).map((src, i) => (
+                  <MomentPhoto
+                    key={src}
+                    src={src}
+                    alt={`${coupleDisplayName} — favorite moment ${i + 2}`}
+                    sizes="(max-width: 1024px) 38vw, 18vw"
+                    className={momentB && momentC ? "col-span-2" : "col-span-2 row-span-2"}
+                  />
+                ))}
               </div>
               <p className={`font-goudy-italic ${ct.body} text-center`} style={{ color: palette.body }}>
                 {content.moments.caption}

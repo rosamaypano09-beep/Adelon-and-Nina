@@ -516,11 +516,11 @@ export const siteConfig = {
     closingNote: "A glimpse into the moments that made our hearts one",
     // Your own video file in /public (e.g. "/video/our-story.mp4"). When set it is
     // played directly with no YouTube at all; leave "" to use youtubeId instead.
-    videoSrc: "",
+    videoSrc: "https://youtu.be/c6ThrZn8OuY",
     // YouTube video ID — the part after "watch?v=" (or after "youtu.be/")
-    youtubeId: "YPyS5XS-9Ck",
+    youtubeId: "c6ThrZn8OuY",
     // Cover image shown before the video plays
-    thumbnail: "/desktop-background/couples (20).webp",
+    thumbnail: "/desktop-background/couple (6).webp",
     thumbnailAlt: `${COUPLE_LABEL} — video cover`,
     playLabel: "Play our video",
   },
@@ -638,7 +638,7 @@ export const siteConfig = {
     },
     // Uses COUPLE_PHOTOS; replace with your own list if the gallery should differ.
     // text → caption used as the photo's description
-    images: COUPLE_PHOTOS.map((image, i) => ({ image, text: `Cid and Jas, photo ${i + 1}` })),
+    images: COUPLE_PHOTOS.map((image, i) => ({ image, text: `${COUPLE_LABEL}, photo ${i + 1}` })),
   },
 
   // Event details section (components/sections/details.tsx)
@@ -935,9 +935,12 @@ export const siteConfig = {
       "Little Bride": "Little Bride",
       "Flower Girls": "Flower Girls",
       "Beloved Entourage": "Beloved Entourage",
-      "To light our path": "To light our path",
-      "To Cloth us as one": "To Cloth us as one",
-      "To bind us together": "To bind us together",
+      "Candle Sponsors": "Candle Sponsors",
+      "Veil Sponsors": "Veil Sponsors",
+      "Cord Sponsors": "Cord Sponsors",
+      "Bridesmen": "Bridesmen",
+      "Escorts": "Escorts",
+      "Petal Maidens": "Petal Maidens",
     } as Record<string, string>,
   },
   // RSVP / guest list (components/sections/guest-list.tsx) — card, search, RSVP form and all modals.
@@ -1662,9 +1665,12 @@ Now, as they prepare to say yes before God and the people they love most, Cather
   seeYouThere: {
     titleLine1: "See you",
     titleLine2: "there!",
-    // Photos mode
-    photo: COUPLE_PHOTOS[4],
+    // Full-bleed photos: crossfade on mobile, side-by-side triptych on md+ (portrait shots work best)
+    photos: [COUPLE_PHOTOS[4], COUPLE_PHOTOS[5], COUPLE_PHOTOS[6]],
     photoAlt: "{couple}",
+    eyebrow: "Until we meet",
+    script: "with love, {couple}", // "" hides it
+    message: "We can't wait to celebrate this beautiful day with you.", // "" hides it
     // Plain mode
     plain: {
       eyebrow: "Until we meet",
@@ -1762,8 +1768,12 @@ Now, as they prepare to say yes before God and the people they love most, Cather
       show: true,
       title: "Our Favorite Moments",
       caption: "Share your snapshots to be featured in our keepsake gallery.",
-      // 3 photos: two squares on top, one wide photo below
-      images: COUPLE_PHOTOS.slice(0, 3),
+      // 3 portrait photos: one tall feature on the left, two stacked on the right
+      images: [
+        "/mobile-background/couple (1).webp",
+        "/mobile-background/couple (2).webp",
+        "/mobile-background/couple (12).webp",
+      ],
     },
     website: {
       show: true,
@@ -1805,9 +1815,9 @@ Now, as they prepare to say yes before God and the people they love most, Cather
     puhon: {
       show: true,
       images: [
-       "/desktop-background/couple (19).webp",
-       "/desktop-background/couple (13).webp",
-        "/desktop-background/couple (10).webp",
+        "/desktop-background/couple (11).webp",
+        "/desktop-background/couple (5).webp",
+        "/desktop-background/couple (2).webp",
       ],
       intervalMs: 5000, // time each photo stays before fading to the next
     },

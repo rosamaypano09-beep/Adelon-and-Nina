@@ -1628,3 +1628,13 @@ img[src*="%2Flovestorydeco%2F"] {
 @media (prefers-reduced-motion: reduce) {
   .story-rise { display: none; }
 }
+
+/* See You There (components/sections/see-you-there.tsx): slow Ken Burns drift on the desktop triptych */
+@keyframes see-you-drift {
+  0%, 100% { transform: scale(1.04) translate3d(0, 0, 0); }
+  50% { transform: scale(1.1) translate3d(0, -1.5%, 0); }
+}
+.see-you-drift {
+  animation: see-you-drift 18s ease-in-out infinite;
+  will-change: transform;
+}

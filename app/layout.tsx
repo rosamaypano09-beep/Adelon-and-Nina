@@ -16,16 +16,14 @@ import {
 import { anastasiaScript } from "@/lib/fonts"
 
 const canonicalUrl = canonicalSiteUrl
-const desktopHero = siteConfig.linkPreviewImage
-const mobileHero = siteConfig.linkPreviewImage
-const eventImageUrl = `${canonicalUrl}${desktopHero}`
-const OG_IMAGE_FALLBACK = `${canonicalUrl}${desktopHero}`
+// Link preview (Facebook, Messenger, Viber, WhatsApp, X). Absolute https URLs are required:
+// a forwarded message is re-scraped without the original page, so relative paths break.
+const OG_IMAGE_FALLBACK = `${canonicalUrl}${siteConfig.linkPreviewImage}`
+const OG_IMAGE_SQUARE = `${canonicalUrl}${siteConfig.linkPreviewImageSquare}`
+const eventImageUrl = OG_IMAGE_FALLBACK
 // og:image:type must match the real file — Facebook / Messenger drop the image on a mismatch
-const OG_IMAGE_TYPE = /\.png$/i.test(desktopHero)
-  ? "image/png"
-  : /\.webp$/i.test(desktopHero)
-    ? "image/webp"
-    : "image/jpeg"
+const imageType = (path: string) =>
+  /\.png$/i.test(path) ? "image/png" : /\.webp$/i.test(path) ? "image/webp" : "image/jpeg"
 
 const coupleNames = `${siteConfig.couple.groomNickname} & ${siteConfig.couple.brideNickname}`
 const eventTitle = `${coupleNames} - Wedding Invitation`
@@ -135,14 +133,24 @@ export const metadata: Metadata = {
     siteName: `${coupleNames} Wedding`,
     locale: "en_PH",
     type: "website",
+    // Wide image first (what Facebook / Messenger / Viber show); square second for apps that prefer it.
+    // width/height must match the real files, or Messenger may skip the image.
     images: [
       {
         url: OG_IMAGE_FALLBACK,
         secureUrl: OG_IMAGE_FALLBACK,
         width: 1200,
         height: 630,
-        type: OG_IMAGE_TYPE,
+        type: imageType(siteConfig.linkPreviewImage),
         alt: `${coupleNames} Wedding Invitation - ${siteConfig.wedding.date}`,
+      },
+      {
+        url: OG_IMAGE_SQUARE,
+        secureUrl: OG_IMAGE_SQUARE,
+        width: 600,
+        height: 600,
+        type: imageType(siteConfig.linkPreviewImageSquare),
+        alt: `${coupleNames} Wedding Invitation`,
       },
     ],
   },
@@ -232,8 +240,6 @@ export default function RootLayout({
             />
           )
         })}
-        <link rel="preload" as="image" href={mobileHero} media="(max-width: 767px)" />
-        <link rel="preload" as="image" href={desktopHero} media="(min-width: 768px)" />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       </head>
       <body

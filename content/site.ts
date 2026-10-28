@@ -416,7 +416,7 @@ export const siteConfig = {
     messageForm: "https://docs.google.com/forms/d/e/1FAIpQLScW07l2wTfvjtulFPtYoYKyUjSGhxgqAOdi6KbnJ93E_zijIw/formResponse",   //done
     message: "https://script.google.com/macros/s/AKfycbwQTiw6gUFsg9rA8ItmpiXV4K_S75WnWk67Wbd2sxGTAsX6K0ijE3eCshTYxveEK4kr/exec", //done 
     guestList: "https://script.google.com/macros/s/AKfycby0kjQYxbUs3YUb5dchyMcydDGhtl-28-Gkz4EfbIx7Mr2lQAYuEMvd2mxjKNyrd5wt/exec",  //done
-    guestRequest: "https://script.google.com/macros/s/AKfycbwJ5rLsF-XxgG--oXjkAOhs6TV3JNmsXL0761l6lOs6hDgaxzDD8x3cnGfs3QffQJju/exec",  //done
+    guestRequest: "https://script.google.com/macros/s/AKfycbx1Bxqqwsa3SRB9unHINEcRHfHbmF4cLOeBQBNSgh7fvvVHwO4oZbgREzozGvyvRpNG/exec",  //done
     entourage: "https://script.google.com/macros/s/AKfycbzsBu53v0M6SXYZY0myyILFvXBnIxmQlWYoUtBxZtLNiQDDCujde3dDWuLkr4oR127H/exec",  //done
     sponsors: SPONSORS_API,  //done 
     // Principal sponsors shown on /inviteone and /invitetwo (entourage section)
@@ -1662,7 +1662,7 @@ Now, as they prepare to say yes before God and the people they love most, Cather
     embedUrl:
     //https://open.spotify.com/embed/playlist/5sT43YjdM8pJ3xtEkrxyEY?utm_source=generator&si=e5e64aa63fd04356
       "https://open.spotify.com/embed/playlist/5ZNTnGQuZwJF7qehJGyjrt?utm_source=generator&si=f625387fd73f4c1e",
-    spotifyUrl: "https://open.spotify.com/playlist/5ZNTnGQuZwJF7qehJGyjrt?si=t-J1gI0TRW2k8PDANn4iPQ",
+    spotifyUrl: "https://open.spotify.com/playlist/5ZNTnGQuZwJF7qehJGyjrt?si=rKt8Ak3MSQqV-q8HiEIeDw",
   },
   // Closing "See you there!" section (components/sections/see-you-there.tsx).
   //   photos mode (loadingScreen.display "photos") → full-screen couple photo
